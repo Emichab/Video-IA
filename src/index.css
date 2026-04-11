@@ -244,6 +244,38 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);-webkit-
 .cost-item{display:flex;justify-content:space-between;padding:10px 14px;background:var(--bg1);border:1px solid var(--brd);border-radius:8px;font-size:.82rem}
 .cost-val{font-weight:600;color:var(--cyan);font-family:'JetBrains Mono',monospace}
 
+/* toggle */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-info{display:flex;flex-direction:column;gap:2px}
+.toggle-label{font-size:.88rem;font-weight:500}
+.toggle-desc{font-size:.75rem;color:var(--tx3)}
+.toggle-switch{width:44px;height:24px;border-radius:12px;background:var(--bg3);cursor:pointer;position:relative;transition:.25s}
+.toggle-switch.on{background:var(--purple)}
+.toggle-switch.on.cyan{background:var(--cyan)}
+.toggle-knob{width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:3px;left:3px;transition:.25s}
+.toggle-switch.on .toggle-knob{left:23px}
+
+/* options card */
+.options-card{background:var(--bg1);border:1px solid var(--brd);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+
+/* subtitle options */
+.sub-options{padding-top:12px;border-top:1px solid var(--brd);display:flex;flex-direction:column;gap:10px}
+.color-pills{display:flex;gap:6px}
+.color-pill{width:28px;height:28px;border-radius:50%;border:2px solid var(--brd);cursor:pointer;transition:.2s}
+.color-pill.on{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,0.3);transform:scale(1.15)}
+.sel{padding:6px 10px;background:var(--bg);border:1px solid var(--brd);border-radius:8px;color:var(--tx);font-family:inherit;font-size:.82rem}
+.sel:focus{outline:none;border-color:var(--purple)}
+
+/* cost tags */
+.cost-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;font-size:.7rem;font-weight:600;background:rgba(34,211,238,0.12);color:var(--cyan);font-family:'JetBrains Mono',monospace}
+.cost-tag.sub{background:rgba(168,85,247,0.12);color:var(--purple)}
+
+/* audio/sub tags in cards */
+.audio-tag{background:rgba(34,211,238,0.15)!important;color:var(--cyan)!important}
+.sub-tag{background:rgba(168,85,247,0.15)!important;color:var(--purple)!important}
+.gap-6{gap:6px}
+
 /* responsive */
 @media(max-width:900px){
   .gen-grid{grid-template-columns:1fr}
