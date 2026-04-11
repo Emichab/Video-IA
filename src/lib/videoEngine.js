@@ -1,7 +1,7 @@
 // ─── NeoFrame Video Engine v5 ───
 // fal.ai: Seedance 1.5 (audio) + Auto-Caption (subtitles) + Canvas fallback
 
-const FAL_API_KEY = "FAL_KEY_PLACEHOLDER";
+const FAL_API_KEY = "3cfb2180-f981-492d-9dff-5714fc366082:42e79d71b4824223ff082ee8f5c132d3";
 const FAL_BASE = "https://queue.fal.run";
 const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
 
