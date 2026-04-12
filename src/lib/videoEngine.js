@@ -56,7 +56,7 @@ async function downloadUrl(url) {
 // ══════════════════════════════════════
 export async function generateVideo({ prompt, style, duration, ratio, withAudio, withSubtitles, subtitleStyle, onProgress }) {
   var durationSec = parseInt(duration);
-  var hasFal = FAL_API_KEY && FAL_API_KEY !== "FAL_KEY_PLACEHOLDER";
+  var hasFal = FAL_API_KEY && FAL_API_KEY !== "3cfb2180-f981-492d-9dff-5714fc366082:42e79d71b4824223ff082ee8f5c132d3";
 
   if (hasFal) {
     try {
