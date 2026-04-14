@@ -4,12 +4,15 @@ import { generateVideo, createClipsFromVideo, downloadVideo } from "../lib/video
 import AdminPanel from "./AdminPanel.jsx";
 
 const STYLES = ["Cinematográfico","Anime","3D Render","Documental","Fantasía","Sci-Fi","Minimalista","Acuarela"];
-const DURATIONS = ["5s","10s","15s","30s","60s"];
-const RATIOS = ["16:9","9:16","1:1","4:3"];
+const DURATIONS = ["6s","8s","10s","14s","20s"];
+const RATIOS = ["16:9","9:16","1:1"];
 const CLIP_DURS = ["15s","30s","45s","60s"];
 const CLIP_FMTS = ["9:16","16:9","1:1"];
 const SUB_COLORS = ["white","yellow","#00ff88","#00ccff","#ff6b6b"];
 const SUB_POSITIONS = ["bottom","center","top"];
+
+// Cost per duration (in app credits)
+const DUR_COSTS = { "6s": 1, "8s": 2, "10s": 2, "14s": 3, "20s": 4 };
 
 function Pills({ items, value, onChange, small }) {
   return (
@@ -72,17 +75,20 @@ function GenerateTab() {
   const [videos, setVideos] = useState([]);
   const [err, setErr] = useState("");
 
-  const costKey = `generate_${dur}`;
-  const cost = COSTS[costKey] || 2;
-  const audioCost = withAudio ? Math.ceil(cost * 0.5) : 0;
+  const baseCost = DUR_COSTS[dur] || 2;
+  const audioCost = withAudio ? 1 : 0;
   const subCost = withSubs ? 1 : 0;
-  const totalCost = cost + audioCost + subCost;
+  const totalCost = baseCost + audioCost + subCost;
+
+  // Real price in USD for display
+  const seconds = parseInt(dur);
+  const usdPrice = (seconds * 0.04).toFixed(2);
 
   const generate = async () => {
     if (!prompt.trim() || busy) return;
     setErr("");
     if ((profile?.credits || 0) < totalCost) {
-      setErr(`Necesitas ${totalCost} créditos. Tienes ${profile?.credits || 0}.`);
+      setErr("Necesitas " + totalCost + " créditos. Tienes " + (profile?.credits || 0) + ".");
       return;
     }
     const ok = await useCredits(totalCost);
@@ -112,7 +118,7 @@ function GenerateTab() {
         <span className="sec-badge purple">✦</span>
         <div>
           <h2>Generador de Video con IA</h2>
-          <p className="dim">Videos realistas con audio y subtítulos — descargables</p>
+          <p className="dim">Videos con audio y subtítulos — LTX Video 2.0 Fast</p>
         </div>
       </div>
 
@@ -137,7 +143,6 @@ function GenerateTab() {
             </div>
           </div>
 
-          {/* Audio & Subtitle toggles */}
           <div className="options-card">
             <Toggle label="🔊 Audio" checked={withAudio} onChange={setWithAudio} color="cyan"
               description="Genera audio sincronizado (diálogos, efectos, música)" />
@@ -181,12 +186,14 @@ function GenerateTab() {
             </span>
             <span className="sep">·</span>
             <span>Tienes: <strong className="cyan">◈ {profile?.credits || 0}</strong></span>
+            <span className="sep">·</span>
+            <span className="dim" style={{fontSize:".75rem"}}>~${usdPrice} USD</span>
           </div>
 
           {err && <div className="err-msg">{err}</div>}
 
           <button className={`btn-main${busy ? " loading" : ""}`} onClick={generate} disabled={busy || !prompt.trim()}>
-            {busy ? <><span className="spin" /> {status}</> : <>⚡ Generar Video — {totalCost} créditos</>}
+            {busy ? <><span className="spin" /> {status}</> : <>⚡ Generar Video {dur} — {totalCost} créditos</>}
           </button>
 
           {busy && <ProgressBar value={pct} label={status} />}
@@ -230,7 +237,7 @@ function GenerateTab() {
                   </div>
                 </div>
                 <div className="card-actions">
-                  <button className="btn-sm accent" onClick={() => downloadVideo(v.url, `neoframe-${v.id}.mp4`)}>⬇ Descargar</button>
+                  <button className="btn-sm accent" onClick={() => downloadVideo(v.url, "neoframe-" + v.id + ".mp4")}>⬇ Descargar</button>
                 </div>
               </div>
             ))}
@@ -263,7 +270,7 @@ function ClipsTab() {
   const process = async () => {
     if (!file || busy) return;
     setErr("");
-    if ((profile?.credits || 0) < cost) { setErr(`Necesitas ${cost} créditos.`); return; }
+    if ((profile?.credits || 0) < cost) { setErr("Necesitas " + cost + " créditos."); return; }
     const ok = await useCredits(cost);
     if (!ok) { setErr("Créditos insuficientes"); return; }
     setBusy(true); setPct(0); setClips([]);
@@ -351,12 +358,12 @@ function ClipsTab() {
                 <div className="card-video tall"><video src={c.url} controls poster={c.thumbUrl} /><span className="score-badge">⚡ {c.score}</span></div>
                 <div className="card-body"><p className="card-txt sm">{c.name}</p></div>
                 <div className="card-actions">
-                  <button className="btn-sm accent" onClick={() => downloadVideo(c.url, `clip-${c.id}.webm`)}>⬇ Descargar</button>
+                  <button className="btn-sm accent" onClick={() => downloadVideo(c.url, "clip-" + c.id + ".webm")}>⬇ Descargar</button>
                 </div>
               </div>
             ))}
           </div>
-          <button className="btn-dl-all" onClick={() => clips.forEach((c, i) => setTimeout(() => downloadVideo(c.url, `clip-${i + 1}.webm`), i * 500))}>⬇ Descargar Todos</button>
+          <button className="btn-dl-all" onClick={() => clips.forEach((c, i) => setTimeout(() => downloadVideo(c.url, "clip-" + (i + 1) + ".webm"), i * 500))}>⬇ Descargar Todos</button>
         </div>
       )}
     </section>
