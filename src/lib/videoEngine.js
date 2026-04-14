@@ -1,5 +1,5 @@
-// ─── NeoFrame Video Engine v11 ───
-// LTX Video 2.0 Fast — duration as string, style in prompt
+// ─── NeoFrame Video Engine v12 ───
+// LTX Video 2.0 Fast — correct "duration" param as number
 
 async function callFal(endpoint, body) {
   var resp = await fetch("/api/fal", {
@@ -41,15 +41,11 @@ export async function generateVideo({ prompt, style, duration, ratio, withAudio,
 
     var body = {
       prompt: fullPrompt,
-      seconds: String(durationSec),
+      duration: durationSec,
       resolution: "1080p",
       aspect_ratio: ratio === "9:16" ? "9:16" : ratio === "1:1" ? "1:1" : "16:9",
       audio_enabled: withAudio ? true : false,
     };
-
-    if (durationSec > 10) {
-      body.fps = 25;
-    }
 
     console.log("LTX request:", body);
     onProgress?.(8, "Generando video " + durationSec + "s...");
