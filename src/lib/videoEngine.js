@@ -1,5 +1,5 @@
-// ─── NeoFrame Video Engine v10 ───
-// LTX Video 2.0 Fast — supports 6-20s, style in prompt, audio
+// ─── NeoFrame Video Engine v11 ───
+// LTX Video 2.0 Fast — duration as string, style in prompt
 
 async function callFal(endpoint, body) {
   var resp = await fetch("/api/fal", {
@@ -20,59 +20,39 @@ function findVideoUrl(data) {
   throw new Error("No video URL found");
 }
 
-// Map user duration to LTX supported values: 6,8,10,12,14,16,18,20
-function mapDuration(dur) {
-  var secs = parseInt(dur);
-  var allowed = [6, 8, 10, 12, 14, 16, 18, 20];
-  // Find closest allowed value
-  var closest = 6;
-  for (var i = 0; i < allowed.length; i++) {
-    if (Math.abs(allowed[i] - secs) < Math.abs(closest - secs)) {
-      closest = allowed[i];
-    }
-  }
-  return closest;
-}
-
 export async function generateVideo({ prompt, style, duration, ratio, withAudio, withSubtitles, subtitleStyle, onProgress }) {
-  var durationSec = mapDuration(duration);
+  var durationSec = parseInt(duration);
 
-  // Add style to the prompt so LTX applies it visually
   var fullPrompt = prompt;
-  if (style && style !== "Cinematográfico") {
-    var styleMap = {
-      "Anime": "anime style, Japanese animation aesthetic, vibrant colors, ",
-      "3D Render": "3D rendered, CGI style, photorealistic 3D graphics, ",
-      "Documental": "documentary style, realistic footage, handheld camera, ",
-      "Fantasía": "fantasy style, magical, ethereal lighting, mystical atmosphere, ",
-      "Sci-Fi": "science fiction style, futuristic, neon lights, cyberpunk aesthetic, ",
-      "Minimalista": "minimalist style, clean, simple composition, muted colors, ",
-      "Acuarela": "watercolor painting style, soft colors, artistic brushstrokes, ",
-    };
-    var prefix = styleMap[style] || "";
-    fullPrompt = prefix + prompt;
-  } else {
-    fullPrompt = "cinematic style, professional cinematography, dramatic lighting, " + prompt;
-  }
+  var styleMap = {
+    "Cinematográfico": "cinematic style, professional cinematography, dramatic lighting, ",
+    "Anime": "anime style, Japanese animation aesthetic, vibrant colors, ",
+    "3D Render": "3D rendered, CGI style, Pixar quality, photorealistic 3D graphics, ",
+    "Documental": "documentary style, realistic footage, handheld camera, natural lighting, ",
+    "Fantasía": "fantasy style, magical, ethereal lighting, mystical atmosphere, ",
+    "Sci-Fi": "science fiction style, futuristic, neon lights, cyberpunk aesthetic, ",
+    "Minimalista": "minimalist style, clean, simple composition, muted colors, ",
+    "Acuarela": "watercolor painting style, soft colors, artistic brushstrokes, ",
+  };
+  fullPrompt = (styleMap[style] || "cinematic style, ") + prompt;
 
   try {
     onProgress?.(5, "Enviando a LTX Video AI (" + durationSec + "s)...");
 
     var body = {
       prompt: fullPrompt,
-      seconds: durationSec,
+      seconds: String(durationSec),
       resolution: "1080p",
       aspect_ratio: ratio === "9:16" ? "9:16" : ratio === "1:1" ? "1:1" : "16:9",
       audio_enabled: withAudio ? true : false,
     };
 
-    // Videos longer than 10s need 25fps
     if (durationSec > 10) {
       body.fps = 25;
     }
 
     console.log("LTX request:", body);
-    onProgress?.(8, "Generando video " + durationSec + "s con " + (withAudio ? "audio" : "sin audio") + "...");
+    onProgress?.(8, "Generando video " + durationSec + "s...");
 
     var result = await callFal("fal-ai/ltx-2/text-to-video/fast", body);
     console.log("LTX result:", result);
@@ -80,7 +60,6 @@ export async function generateVideo({ prompt, style, duration, ratio, withAudio,
     var videoUrl = findVideoUrl(result);
     onProgress?.(70, "Video de " + durationSec + "s generado!");
 
-    // Subtitles
     if (withSubtitles && withAudio) {
       onProgress?.(75, "Agregando subtítulos...");
       var subStyle = subtitleStyle || {};
@@ -91,7 +70,7 @@ export async function generateVideo({ prompt, style, duration, ratio, withAudio,
         font_size: 80,
         font_weight: "bold",
         font_color: subStyle.color || "white",
-        highlight_color: subStyle.highlightColor || "#a855f7",
+        highlight_color: subStyle.highlightColor || "#c8956c",
         stroke_width: 3,
         stroke_color: "black",
         background_color: "none",
