@@ -145,6 +145,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);-webk
 .counter button:hover{background:var(--bg2)}
 .counter span{width:38px;text-align:center;font-weight:600;font-size:.9rem;font-family:'IBM Plex Mono',monospace}
 
+.cost-tag.free{background:rgba(109,186,122,.12);color:var(--green)}
+.narration-note{font-size:.78rem;color:var(--gold);padding:8px 12px;background:rgba(212,160,84,.06);border:1px solid rgba(212,160,84,.1);border-radius:8px;margin-top:4px}
+
 .gallery{margin-top:36px}
 .gallery h3{font-size:1.05rem;font-weight:600;margin-bottom:18px;display:flex;align-items:center;gap:9px;color:var(--cream)}
 .count-badge{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--grd-rose);font-size:.72rem;font-weight:700}
