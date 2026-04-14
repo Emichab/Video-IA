@@ -10,8 +10,6 @@ const CLIP_DURS = ["15s","30s","45s","60s"];
 const CLIP_FMTS = ["9:16","16:9","1:1"];
 const SUB_COLORS = ["white","yellow","#00ff88","#00ccff","#ff6b6b"];
 const SUB_POSITIONS = ["bottom","center","top"];
-
-// Cost per duration (in app credits)
 const DUR_COSTS = { "6s": 1, "8s": 2, "10s": 2, "14s": 3, "20s": 4 };
 
 function Pills({ items, value, onChange, small }) {
@@ -24,20 +22,13 @@ function Pills({ items, value, onChange, small }) {
   );
 }
 
-function ProgressBar({ value, variant, label, steps }) {
+function ProgressBar({ value, label }) {
   return (
     <div className="prog-wrap">
       <div className="prog-track">
-        <div className={`prog-fill ${variant || ""}`} style={{ width: `${Math.min(value, 100)}%` }} />
+        <div className="prog-fill" style={{ width: `${Math.min(value, 100)}%` }} />
       </div>
       {label && <div className="prog-label">{label}</div>}
-      {steps && (
-        <div className="prog-steps">
-          {steps.map((s, i) => (
-            <span key={i} className={value > (i + 1) * (100 / steps.length) - 10 ? "lit" : ""}>{s}</span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -56,17 +47,16 @@ function Toggle({ label, checked, onChange, description, color }) {
   );
 }
 
-/* ━━━━ TAB 1 — GENERATE ━━━━ */
 function GenerateTab() {
   const { profile, useCredits, addStat, refreshProfile } = useAuth();
   const [prompt, setPrompt] = useState("");
+  const [narration, setNarration] = useState("");
   const [style, setStyle] = useState("Cinematográfico");
   const [dur, setDur] = useState("10s");
   const [ratio, setRatio] = useState("16:9");
-  const [withAudio, setWithAudio] = useState(true);
+  const [withNarration, setWithNarration] = useState(false);
   const [withSubs, setWithSubs] = useState(false);
   const [subColor, setSubColor] = useState("white");
-  const [subHighlight, setSubHighlight] = useState("#a855f7");
   const [subPosition, setSubPosition] = useState("bottom");
   const [subLang, setSubLang] = useState("es");
   const [busy, setBusy] = useState(false);
@@ -76,11 +66,9 @@ function GenerateTab() {
   const [err, setErr] = useState("");
 
   const baseCost = DUR_COSTS[dur] || 2;
-  const audioCost = withAudio ? 1 : 0;
+  const narrationCost = withNarration ? 0 : 0; // Free!
   const subCost = withSubs ? 1 : 0;
-  const totalCost = baseCost + audioCost + subCost;
-
-  // Real price in USD for display
+  const totalCost = baseCost + subCost;
   const seconds = parseInt(dur);
   const usdPrice = (seconds * 0.04).toFixed(2);
 
@@ -98,15 +86,16 @@ function GenerateTab() {
     try {
       const result = await generateVideo({
         prompt: prompt.trim(), style, duration: dur, ratio,
-        withAudio, withSubtitles: withSubs,
-        subtitleStyle: { color: subColor, highlightColor: subHighlight, position: subPosition, language: subLang },
+        narrationText: withNarration ? narration : "",
+        withSubtitles: withSubs,
+        subtitleStyle: { color: subColor, position: subPosition, language: subLang },
         onProgress: (p, s) => { setPct(p); setStatus(s); },
       });
       await addStat("videosGenerated");
       setVideos((prev) => [{
         id: Date.now(), prompt: prompt.trim(), style, dur, ratio,
         ts: new Date().toLocaleString(), url: result.url, blob: result.blob,
-        hasAudio: withAudio, hasSubs: withSubs,
+        hasNarration: withNarration, hasSubs: withSubs,
       }, ...prev]);
     } catch (e) { setErr("Error: " + e.message); }
     setBusy(false); setPct(0); await refreshProfile();
@@ -118,15 +107,15 @@ function GenerateTab() {
         <span className="sec-badge purple">✦</span>
         <div>
           <h2>Generador de Video con IA</h2>
-          <p className="dim">Videos con audio y subtítulos — LTX Video 2.0 Fast</p>
+          <p className="dim">Video + narración en español sin censura — descargable</p>
         </div>
       </div>
 
       <div className="gen-grid">
         <div className="col gap-20">
-          <label className="lbl">Describe tu video</label>
-          <textarea className="ta" rows={4}
-            placeholder="Ej: Una persona caminando por una playa al atardecer con olas suaves y gaviotas volando..."
+          <label className="lbl">Describe la escena visual (en inglés funciona mejor)</label>
+          <textarea className="ta" rows={3}
+            placeholder="Ej: 3D animated video. Three happy cartoon friends in colorful jerseys watching football on TV, cheering and celebrating. Cozy living room."
             value={prompt} onChange={(e) => setPrompt(e.target.value)} />
 
           <label className="lbl">Estilo Visual</label>
@@ -144,12 +133,23 @@ function GenerateTab() {
           </div>
 
           <div className="options-card">
-            <Toggle label="🔊 Audio" checked={withAudio} onChange={setWithAudio} color="cyan"
-              description="Genera audio sincronizado (diálogos, efectos, música)" />
-            <Toggle label="💬 Subtítulos" checked={withSubs} onChange={setWithSubs} color="purple"
-              description={withAudio ? "Agrega subtítulos automáticos al video" : "Requiere audio activado"} />
+            <Toggle label="🎙 Narración en español" checked={withNarration} onChange={setWithNarration} color="cyan"
+              description="Agrega voz narrando tu script (gratis, sin censura)" />
 
-            {withSubs && withAudio && (
+            {withNarration && (
+              <div className="sub-options fade-in">
+                <label className="lbl">Script de narración (escribe lo que quieras, sin filtros)</label>
+                <textarea className="ta" rows={4}
+                  placeholder="Ej: Todos creemos que somos expertos viendo el fútbol desde el sillón. Llega la quiniela del Mundial 2026. Entras con $1,500 pesos. Cada semana hay premios. Los tres primeros lugares se llevan grandes premios. Inscríbete ahora."
+                  value={narration} onChange={(e) => setNarration(e.target.value)} />
+                <div className="narration-note">💡 Este texto se convierte a voz con la Speech API del navegador — es gratis y puedes decir lo que quieras sin filtros.</div>
+              </div>
+            )}
+
+            <Toggle label="💬 Subtítulos" checked={withSubs} onChange={setWithSubs} color="purple"
+              description={withNarration ? "Agrega subtítulos automáticos" : "Requiere narración activada"} />
+
+            {withSubs && withNarration && (
               <div className="sub-options fade-in">
                 <div className="row-wrap">
                   <div className="col gap-6 flex1">
@@ -180,10 +180,9 @@ function GenerateTab() {
           </div>
 
           <div className="cost-info">
-            <span>Costo: <strong>{totalCost} crédito{totalCost !== 1 ? "s" : ""}</strong>
-              {withAudio && <span className="cost-tag">+audio</span>}
-              {withSubs && <span className="cost-tag sub">+subs</span>}
-            </span>
+            <span>Costo: <strong>{totalCost} crédito{totalCost !== 1 ? "s" : ""}</strong></span>
+            {withNarration && <span className="cost-tag free">🎙 narración gratis</span>}
+            {withSubs && <span className="cost-tag sub">+subs</span>}
             <span className="sep">·</span>
             <span>Tienes: <strong className="cyan">◈ {profile?.credits || 0}</strong></span>
             <span className="sep">·</span>
@@ -223,7 +222,7 @@ function GenerateTab() {
             {videos.map((v) => (
               <div key={v.id} className="card">
                 <div className="card-video">
-                  <video src={v.url} muted={!v.hasAudio} loop
+                  <video src={v.url} loop
                     onMouseEnter={(e) => e.target.play()} onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }} />
                 </div>
                 <div className="card-body">
@@ -232,12 +231,12 @@ function GenerateTab() {
                     <span className="tag">{v.style}</span>
                     <span className="tag">{v.dur}</span>
                     <span className="tag">{v.ratio}</span>
-                    {v.hasAudio && <span className="tag audio-tag">🔊 Audio</span>}
+                    {v.hasNarration && <span className="tag audio-tag">🎙 Narración</span>}
                     {v.hasSubs && <span className="tag sub-tag">💬 Subs</span>}
                   </div>
                 </div>
                 <div className="card-actions">
-                  <button className="btn-sm accent" onClick={() => downloadVideo(v.url, "neoframe-" + v.id + ".mp4")}>⬇ Descargar</button>
+                  <button className="btn-sm accent" onClick={() => downloadVideo(v.url, "neoframe-" + v.id + ".webm")}>⬇ Descargar</button>
                 </div>
               </div>
             ))}
@@ -248,7 +247,6 @@ function GenerateTab() {
   );
 }
 
-/* ━━━━ TAB 2 — CLIPS ━━━━ */
 function ClipsTab() {
   const { profile, useCredits, addStat, refreshProfile } = useAuth();
   const [file, setFile] = useState(null);
@@ -256,7 +254,6 @@ function ClipsTab() {
   const [count, setCount] = useState(3);
   const [clipDur, setClipDur] = useState("30s");
   const [fmt, setFmt] = useState("9:16");
-  const [instr, setInstr] = useState("");
   const [busy, setBusy] = useState(false);
   const [pct, setPct] = useState(0);
   const [status, setStatus] = useState("");
@@ -276,7 +273,7 @@ function ClipsTab() {
     setBusy(true); setPct(0); setClips([]);
     try {
       const result = await createClipsFromVideo({
-        file, clipCount: count, clipDuration: clipDur, format: fmt, instructions: instr,
+        file, clipCount: count, clipDuration: clipDur, format: fmt,
         onProgress: (p, s) => { setPct(p); setStatus(s); },
       });
       await addStat("clipsGenerated", count);
@@ -291,7 +288,6 @@ function ClipsTab() {
         <span className="sec-badge rose">✂</span>
         <div><h2>Creador de Clips &amp; Shorts</h2><p className="dim">Sube tu video y genera clips descargables</p></div>
       </div>
-
       <div className={`dropzone${drag ? " dragging" : ""}${file ? " has" : ""}`}
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
         onDrop={onDrop} onClick={() => ref.current?.click()}>
@@ -313,7 +309,6 @@ function ClipsTab() {
           </div>
         )}
       </div>
-
       <div className="col gap-16 mt-24">
         <div className="row-wrap">
           <div className="col gap-8">
@@ -333,29 +328,24 @@ function ClipsTab() {
             <Pills items={CLIP_FMTS} value={fmt} onChange={setFmt} small />
           </div>
         </div>
-
         <div className="cost-info">
           <span>Costo: <strong>{cost} créditos</strong></span>
           <span className="sep">·</span>
           <span>Tienes: <strong className="cyan">◈ {profile?.credits || 0}</strong></span>
         </div>
-
         {err && <div className="err-msg">{err}</div>}
-
         <button className={`btn-main rose${busy ? " loading" : ""}`} onClick={process} disabled={busy || !file}>
           {busy ? <><span className="spin" /> {status}</> : <>✂ Crear Clips — {cost} créditos</>}
         </button>
-
-        {busy && <ProgressBar value={pct} variant="rose" label={status} steps={["Cargando","Analizando","Cortando","Finalizando"]} />}
+        {busy && <ProgressBar value={pct} label={status} />}
       </div>
-
       {clips.length > 0 && (
         <div className="gallery fade-in mt-32">
           <h3>Clips Generados <span className="count-badge">{clips.length}</span></h3>
           <div className="clip-grid">
             {clips.map((c) => (
               <div key={c.id} className="card">
-                <div className="card-video tall"><video src={c.url} controls poster={c.thumbUrl} /><span className="score-badge">⚡ {c.score}</span></div>
+                <div className="card-video tall"><video src={c.url} controls poster={c.thumbUrl} /></div>
                 <div className="card-body"><p className="card-txt sm">{c.name}</p></div>
                 <div className="card-actions">
                   <button className="btn-sm accent" onClick={() => downloadVideo(c.url, "clip-" + c.id + ".webm")}>⬇ Descargar</button>
@@ -363,14 +353,13 @@ function ClipsTab() {
               </div>
             ))}
           </div>
-          <button className="btn-dl-all" onClick={() => clips.forEach((c, i) => setTimeout(() => downloadVideo(c.url, "clip-" + (i + 1) + ".webm"), i * 500))}>⬇ Descargar Todos</button>
+          <button className="btn-dl-all" onClick={() => clips.forEach((c, i) => setTimeout(() => downloadVideo(c.url, "clip-" + (i+1) + ".webm"), i * 500))}>⬇ Descargar Todos</button>
         </div>
       )}
     </section>
   );
 }
 
-/* ━━━━ STUDIO LAYOUT ━━━━ */
 export default function StudioPage() {
   const { profile, logout, isAdmin, refreshProfile } = useAuth();
   const [tab, setTab] = useState("gen");
@@ -379,13 +368,12 @@ export default function StudioPage() {
   return (
     <div className="app">
       <div className="orbs" aria-hidden="true"><div className="orb orb-1" /><div className="orb orb-2" /><div className="orb orb-3" /></div>
-
       <header className="hdr">
         <div className="logo">
           <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
             <rect x="2" y="6" width="28" height="20" rx="3" stroke="url(#slg)" strokeWidth="2" />
             <polygon points="13,11 13,21 22,16" fill="url(#slg)" />
-            <defs><linearGradient id="slg" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stopColor="#c084fc" /><stop offset="100%" stopColor="#22d3ee" /></linearGradient></defs>
+            <defs><linearGradient id="slg" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stopColor="#c8956c" /><stop offset="100%" stopColor="#d4a054" /></linearGradient></defs>
           </svg>
           <span className="logo-name">NeoFrame<span className="grad-text">.ai</span></span>
         </div>
@@ -402,11 +390,8 @@ export default function StudioPage() {
           </div>
         </div>
       </header>
-
       <main className="main">{tab === "gen" ? <GenerateTab /> : <ClipsTab />}</main>
-
       <footer className="ftr">NeoFrame.ai — Powered by AI <span className="dot">·</span> {profile?.name}</footer>
-
       {showAdmin && <AdminPanel onClose={() => { setShowAdmin(false); refreshProfile(); }} />}
     </div>
   );
