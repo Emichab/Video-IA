@@ -1,5 +1,6 @@
-// ─── NeoFrame Video Engine v12 ───
-// LTX Video 2.0 Fast — correct "duration" param as number
+// ─── NeoFrame Video Engine v14 ───
+// LTX video (no audio) + Web Speech API narration (free, no censorship)
+// Merged in browser with Canvas + MediaRecorder
 
 async function callFal(endpoint, body) {
   var resp = await fetch("/api/fal", {
@@ -20,10 +21,147 @@ function findVideoUrl(data) {
   throw new Error("No video URL found");
 }
 
-export async function generateVideo({ prompt, style, duration, ratio, withAudio, withSubtitles, subtitleStyle, onProgress }) {
-  var durationSec = parseInt(duration);
+// Generate narration audio using Web Speech API (free, no censorship)
+function generateNarration(text, lang) {
+  return new Promise(function(resolve, reject) {
+    if (!window.speechSynthesis) {
+      reject(new Error("Tu navegador no soporta Speech API"));
+      return;
+    }
 
-  var fullPrompt = prompt;
+    // Create audio context to record speech
+    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var dest = audioCtx.createMediaStreamDestination();
+    var recorder = new MediaRecorder(dest.stream);
+    var chunks = [];
+    recorder.ondataavailable = function(e) { if (e.data.size) chunks.push(e.data); };
+
+    var utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang || "es-MX";
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+
+    // Find Spanish voice
+    var voices = speechSynthesis.getVoices();
+    var spanishVoice = voices.find(function(v) { return v.lang.startsWith("es"); });
+    if (spanishVoice) utterance.voice = spanishVoice;
+
+    recorder.start();
+
+    utterance.onend = function() {
+      setTimeout(function() {
+        recorder.stop();
+      }, 500);
+    };
+
+    recorder.onstop = function() {
+      var blob = new Blob(chunks, { type: "audio/webm" });
+      var url = URL.createObjectURL(blob);
+      audioCtx.close();
+      resolve({ blob: blob, url: url });
+    };
+
+    utterance.onerror = function(e) {
+      reject(new Error("Speech error: " + e.error));
+    };
+
+    // Route speech to recorder via audio element
+    speechSynthesis.speak(utterance);
+  });
+}
+
+// Merge video + narration by playing both and recording with Canvas
+async function mergeVideoAndNarration(videoUrl, narrationText, lang, onProgress) {
+  onProgress?.(50, "Preparando narración...");
+
+  // Load video
+  var video = document.createElement("video");
+  video.crossOrigin = "anonymous";
+  video.src = videoUrl;
+  video.muted = true;
+  await new Promise(function(r) { video.onloadedmetadata = r; video.load(); });
+  await new Promise(function(r) { video.oncanplay = r; });
+
+  var W = video.videoWidth || 1920;
+  var H = video.videoHeight || 1080;
+  var duration = video.duration;
+
+  // Create canvas
+  var canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  var ctx = canvas.getContext("2d");
+
+  // Create stream from canvas
+  var canvasStream = canvas.captureStream(30);
+
+  // Set up speech synthesis
+  var utterance = new SpeechSynthesisUtterance(narrationText);
+  utterance.lang = lang || "es-MX";
+  utterance.rate = 0.85;
+  utterance.pitch = 1;
+  var voices = speechSynthesis.getVoices();
+  var spanishVoice = voices.find(function(v) { return v.lang.startsWith("es"); });
+  if (spanishVoice) utterance.voice = spanishVoice;
+
+  // Record final output
+  var mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus" : "video/webm";
+  var recorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: 5000000 });
+  var chunks = [];
+  recorder.ondataavailable = function(e) { if (e.data.size) chunks.push(e.data); };
+
+  return new Promise(function(resolve) {
+    recorder.onstop = function() {
+      var blob = new Blob(chunks, { type: mimeType });
+      resolve({ blob: blob, url: URL.createObjectURL(blob), mimeType: mimeType });
+    };
+
+    onProgress?.(55, "Combinando video y narración...");
+
+    recorder.start();
+    video.muted = false;
+    video.volume = 0;
+    video.play();
+
+    // Start narration after small delay
+    setTimeout(function() {
+      speechSynthesis.speak(utterance);
+    }, 500);
+
+    // Draw video frames to canvas
+    var frameCount = 0;
+    function drawFrame() {
+      if (video.ended || video.paused) {
+        setTimeout(function() {
+          recorder.stop();
+        }, 1000);
+        return;
+      }
+      ctx.drawImage(video, 0, 0, W, H);
+      frameCount++;
+      if (frameCount % 30 === 0) {
+        var pct = 55 + Math.floor((video.currentTime / duration) * 35);
+        onProgress?.(pct, "Grabando... " + Math.floor(video.currentTime) + "s / " + Math.floor(duration) + "s");
+      }
+      requestAnimationFrame(drawFrame);
+    }
+    drawFrame();
+
+    // Safety timeout
+    setTimeout(function() {
+      if (recorder.state === "recording") {
+        video.pause();
+        speechSynthesis.cancel();
+        recorder.stop();
+      }
+    }, (duration + 5) * 1000);
+  });
+}
+
+export async function generateVideo({ prompt, style, duration, ratio, narrationText, withSubtitles, subtitleStyle, onProgress }) {
+  var durationSec = parseInt(duration);
+  var hasNarration = narrationText && narrationText.trim().length > 0;
+
   var styleMap = {
     "Cinematográfico": "cinematic style, professional cinematography, dramatic lighting, ",
     "Anime": "anime style, Japanese animation aesthetic, vibrant colors, ",
@@ -34,55 +172,49 @@ export async function generateVideo({ prompt, style, duration, ratio, withAudio,
     "Minimalista": "minimalist style, clean, simple composition, muted colors, ",
     "Acuarela": "watercolor painting style, soft colors, artistic brushstrokes, ",
   };
-  fullPrompt = (styleMap[style] || "cinematic style, ") + prompt;
+  var fullPrompt = (styleMap[style] || "cinematic style, ") + prompt;
 
   try {
-    onProgress?.(5, "Enviando a LTX Video AI (" + durationSec + "s)...");
+    // ── STEP 1: Generate video WITHOUT audio ──
+    onProgress?.(5, "Generando video " + durationSec + "s...");
 
-    var body = {
+    var videoResult = await callFal("fal-ai/ltx-2/text-to-video/fast", {
       prompt: fullPrompt,
       duration: durationSec,
       resolution: "1080p",
       aspect_ratio: ratio === "9:16" ? "9:16" : ratio === "1:1" ? "1:1" : "16:9",
-      audio_enabled: withAudio ? true : false,
-    };
+      audio_enabled: false,
+    });
 
-    console.log("LTX request:", body);
-    onProgress?.(8, "Generando video " + durationSec + "s...");
+    console.log("LTX result:", videoResult);
+    var videoUrl = findVideoUrl(videoResult);
+    onProgress?.(45, "Video generado!");
 
-    var result = await callFal("fal-ai/ltx-2/text-to-video/fast", body);
-    console.log("LTX result:", result);
+    // ── STEP 2: Add narration if provided ──
+    if (hasNarration) {
+      // Load voices first (needed for some browsers)
+      if (speechSynthesis.getVoices().length === 0) {
+        await new Promise(function(r) { speechSynthesis.onvoiceschanged = r; setTimeout(r, 2000); });
+      }
 
-    var videoUrl = findVideoUrl(result);
-    onProgress?.(70, "Video de " + durationSec + "s generado!");
+      var lang = (subtitleStyle && subtitleStyle.language) || "es";
+      var langMap = { "es": "es-MX", "en": "en-US", "pt": "pt-BR", "fr": "fr-FR" };
+      var fullLang = langMap[lang] || "es-MX";
 
-    if (withSubtitles && withAudio) {
-      onProgress?.(75, "Agregando subtítulos...");
-      var subStyle = subtitleStyle || {};
-      var subResult = await callFal("fal-ai/auto-caption", {
-        video_url: videoUrl,
-        language: subStyle.language || "es",
-        font_name: "Montserrat",
-        font_size: 80,
-        font_weight: "bold",
-        font_color: subStyle.color || "white",
-        highlight_color: subStyle.highlightColor || "#c8956c",
-        stroke_width: 3,
-        stroke_color: "black",
-        background_color: "none",
-        position: subStyle.position || "bottom",
-        y_offset: 75,
-        words_per_subtitle: 2,
-        enable_animation: true,
-      });
-      if (subResult.video && subResult.video.url) videoUrl = subResult.video.url;
-      onProgress?.(90, "Subtítulos listos!");
+      var merged = await mergeVideoAndNarration(videoUrl, narrationText.trim(), fullLang, onProgress);
+      onProgress?.(92, "Video con narración listo!");
+
+      // Download merged
+      onProgress?.(95, "Preparando descarga...");
+      onProgress?.(100, "¡Video con narración completado!");
+      return merged;
     }
 
-    onProgress?.(95, "Descargando video...");
+    // ── No narration — just download video ──
+    onProgress?.(90, "Descargando video...");
     var resp = await fetch(videoUrl);
     var blob = await resp.blob();
-    onProgress?.(100, "¡Video de " + durationSec + "s completado!");
+    onProgress?.(100, "¡Video completado!");
     return { blob: blob, url: URL.createObjectURL(blob), mimeType: blob.type || "video/mp4" };
 
   } catch (err) {
