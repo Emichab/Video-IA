@@ -55,7 +55,7 @@ export async function generateVideo({ prompt, style, duration, ratio, withAudio,
     var body = {
       prompt: prompt,
       seconds: Math.min(durationSec, 10),
-      resolution: "720p",
+      resolution: "1080p",
       aspect_ratio: ratio === "9:16" ? "9:16" : ratio === "1:1" ? "1:1" : "16:9",
       audio_enabled: withAudio ? true : false,
     };
